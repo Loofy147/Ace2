@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 # Import the ACESystem and necessary enums
-from ace_implementation import ACESystem, SecurityLevel
+from ace.core.implementation import ACESystem, SecurityLevel
 
 app = FastAPI(
     title="ACE Architecture API",
