@@ -2,8 +2,15 @@
 
 This repository contains the implementation of the ACE (Agentic Context Engineering) system, a self-improving context management system with built-in adversarial robustness.
 
+## Project Structure
+The project is organized into the following directories:
+- `src/ace/core`: Contains the core implementation of the ACE system.
+- `src/ace/api`: Contains the FastAPI application for the REST API.
+- `docs`: Contains documentation, including the ACE architecture.
+- `tests`: Contains tests for the ACE system.
+
 ## ACE Architecture
-For a detailed overview of the ACE architecture, please refer to the [ace-architecture-v2.md](ace-architecture-v2.md) document.
+For a detailed overview of the ACE architecture, please refer to the [docs/ace-architecture-v2.md](docs/ace-architecture-v2.md) document.
 
 ## Running the CLI
 The ACE system can be run as a command-line interface (CLI) to demonstrate its capabilities.
@@ -14,12 +21,12 @@ The ACE system can be run as a command-line interface (CLI) to demonstrate its c
 
 ### Installation
 ```bash
-pip install numpy
+pip install -r requirements.txt
 ```
 
 ### Usage
 ```bash
-python ace_implementation.py
+python -m src.ace.core.implementation
 ```
 
 ## Running the API
@@ -39,7 +46,7 @@ pip install -r requirements.txt
 ### Running the API Server
 To run the API server, use the following command:
 ```bash
-uvicorn ace_api:app --reload
+uvicorn src.ace.api.main:app --reload
 ```
 The API will be available at `http://127.0.0.1:8000`.
 
