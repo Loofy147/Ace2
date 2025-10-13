@@ -1,60 +1,68 @@
-import asyncio
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
-# Import the ACESystem and necessary enums
-from ace.core.implementation import ACESystem, SecurityLevel
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+
+# Import the functional components
+from ace.core.implementation import DynamicContextRepository, Context, SecurityLevel
 
 app = FastAPI(
-    title="ACE Architecture API",
-    version="2.0.0",
-    description="An API for the Agentic Context Engineering (ACE) system.",
+    title="ACE - Dynamic Context Repository API",
+    version="0.1.0",
+    description="An API for the functional Dynamic Context Repository (DCR) component.",
 )
 
-# Instantiate the ACE System
-ace_system = ACESystem()
+# Instantiate the DCR
+dcr = DynamicContextRepository(base_storage_path="api_dcr_storage")
 
-class ProcessRequest(BaseModel):
-    input: str
+class StoreRequest(BaseModel):
+    content: dict
     domain: Optional[str] = "general"
     security_level: int = 0
 
+class StoreResponse(BaseModel):
+    status: str
+    context_id: str
+
 @app.on_event("startup")
-async def startup_event():
-    # Although ACESystem is not async in its __init__,
-    # we can prepare for future async initializations
-    # For now, the instance is already created synchronously
-    print("ACE System is ready.")
+def startup_event():
+    print("DCR API is ready.")
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    await ace_system.shutdown()
-
-@app.get("/")
-def read_root():
-    """Root endpoint to check if the API is running."""
-    return {"message": "ACE API is running"}
-
-@app.post("/context/adapt")
-async def process_context(request: ProcessRequest):
+@app.post("/context/store", response_model=StoreResponse)
+def store_context(request: StoreRequest):
     """
-    Process input through the Adversarial Context Adaptation Layer (ACAL).
+    Stores a new context in the Dynamic Context Repository.
     """
     try:
-        # Map the integer security level to the SecurityLevel enum
-        try:
-            sec_level = SecurityLevel(request.security_level)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid security level")
+        sec_level = SecurityLevel(request.security_level)
 
-        # Process the input using the ACE system
-        result = await ace_system.process(request.input, sec_level)
+        new_context = Context(
+            content=request.content,
+            domain=request.domain,
+            security_level=sec_level
+        )
 
-        if result['status'] == 'error':
-            raise HTTPException(status_code=500, detail=result['error'])
+        context_id = dcr.store(new_context)
 
-        return result
+        return {"status": "success", "context_id": context_id}
 
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid security level")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/context/retrieve/{context_id}")
+def retrieve_context(context_id: str):
+    """
+    Retrieves a context from the DCR by its ID.
+    """
+    try:
+        context = dcr.retrieve(context_id)
+        if context is None:
+            raise HTTPException(status_code=404, detail="Context not found")
+        return context.to_dict()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
