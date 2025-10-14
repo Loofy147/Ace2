@@ -8,6 +8,7 @@ from typing import Optional
 
 # Import the functional components
 from ace.core.implementation import DynamicContextRepository, Context, SecurityLevel
+from ace.llm.client import process_context_with_llm
 
 app = FastAPI(
     title="ACE - Dynamic Context Repository API",
@@ -26,6 +27,10 @@ class StoreRequest(BaseModel):
 class StoreResponse(BaseModel):
     status: str
     context_id: str
+
+class ProcessResponse(BaseModel):
+    context_id: str
+    llm_response: str
 
 @app.on_event("startup")
 def startup_event():
@@ -65,4 +70,25 @@ def retrieve_context(context_id: str):
             raise HTTPException(status_code=404, detail="Context not found")
         return context.to_dict()
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/llm/process/{context_id}", response_model=ProcessResponse)
+def process_with_llm(context_id: str):
+    """
+    Retrieves a context and processes its content with an LLM.
+    """
+    try:
+        context = dcr.retrieve(context_id)
+        if context is None:
+            raise HTTPException(status_code=404, detail="Context not found")
+
+        llm_response = process_context_with_llm(context)
+
+        if llm_response.startswith("Error:"):
+            raise HTTPException(status_code=500, detail=llm_response)
+
+        return {"context_id": context_id, "llm_response": llm_response}
+
+    except Exception as e:
+        # Catch exceptions from the LLM client, like missing API keys
         raise HTTPException(status_code=500, detail=str(e))
