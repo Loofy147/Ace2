@@ -1,23 +1,29 @@
-# ACE - Agentic Context Engineering System
+# ACE - Dynamic Context Repository (DCR)
 
-This repository contains the implementation of the ACE (Agentic Context Engineering) system, a self-improving context management system with built-in adversarial robustness.
+This repository contains the implementation of the **Dynamic Context Repository (DCR)**, a functional multi-tier caching system for managing contextual data, now with LLM integration capabilities. This project is the first concrete deliverable from the aspirational Agentic Context Engineering (ACE) system, focusing on building real, testable components.
+
+## Core Components
+### 1. Dynamic Context Repository
+The DCR is a multi-tier caching system with the following features:
+- **L1 Hot Cache**: An in-memory, fast-access cache for the most recently used items (implemented with `OrderedDict` for LRU).
+- **L2 Warm Cache**: An in-memory cache for less frequently accessed items (also `OrderedDict` with LRU).
+- **L3 Cold Storage**: A persistent, file-based cache for items evicted from L2.
+- **L4 Archive**: A persistent, read-only archive for long-term storage.
+- **Automatic Tiering**: Contexts are automatically promoted to hotter tiers on access and evicted to colder tiers when caches are full.
+
+### 2. LLM Integration Client
+The system includes a client for processing contexts with a Large Language Model (currently supporting OpenAI's API).
 
 ## Project Structure
-The project is organized into the following directories:
-- `src/ace/core`: Contains the core implementation of the ACE system.
-- `src/ace/api`: Contains the FastAPI application for the REST API.
-- `docs`: Contains documentation, including the ACE architecture.
-- `tests`: Contains tests for the ACE system.
+- `src/ace/core`: Contains the core implementation of the DCR.
+- `src/ace/llm`: Contains the client for communicating with the LLM API.
+- `src/ace/api`: Contains a FastAPI wrapper that exposes the system's functionality.
+- `docs`: Contains high-level architectural and planning documents.
+- `tests`: Contains unit tests for the DCR and LLM client.
+- `ROADMAP.md`: Outlines the development plan and future goals.
 
-## ACE Architecture
-For a detailed overview of the ACE architecture, please refer to the [docs/ace-architecture-v2.md](docs/ace-architecture-v2.md) document.
-
-## Running the CLI
-The ACE system can be run as a command-line interface (CLI) to demonstrate its capabilities.
-
-### Prerequisites
-- Python 3.7+
-- `numpy`
+## Running the CLI Demo
+The project includes a command-line interface (CLI) that demonstrates the DCR's caching, eviction, and promotion mechanisms.
 
 ### Installation
 ```bash
@@ -30,40 +36,35 @@ python -m src.ace.core.implementation
 ```
 
 ## Running the API
-The ACE system is also available as a REST API, providing a more accessible and versatile way to interact with the system.
+The system's components are exposed via a REST API using FastAPI.
 
-### Prerequisites
-- Python 3.7+
-- `fastapi`
-- `uvicorn`
-
-### Installation
-To install the required dependencies, run the following command:
+### API Setup
+Before running the API, you must set the `OPENAI_API_KEY` environment variable:
 ```bash
-pip install -r requirements.txt
+export OPENAI_API_KEY='your_openai_api_key_here'
 ```
 
 ### Running the API Server
-To run the API server, use the following command:
 ```bash
 uvicorn src.ace.api.main:app --reload
 ```
 The API will be available at `http://127.0.0.1:8000`.
 
 ### API Endpoints
-- **GET /**: Returns a welcome message to confirm that the API is running.
-- **POST /context/adapt**: Processes input through the Adversarial Context Adaptation Layer (ACAL).
+- **`POST /context/store`**: Stores a new context in the DCR.
+- **`GET /context/retrieve/{context_id}`**: Retrieves a context from the DCR.
+- **`POST /llm/process/{context_id}`**: Retrieves a context from the DCR and processes its content using the configured LLM.
 
-#### Request Body for `/context/adapt`
-- `input` (str): The input text to be processed.
-- `domain` (str, optional): The domain of the input text (default: "general").
-- `security_level` (int, optional): The security level of the input (default: 0).
+#### Example: Storing and Processing a Context
+1.  **Store a context:**
+    ```bash
+    curl -X POST "http://127.0.0.1:8000/context/store" \
+    -H "Content-Type: application/json" \
+    -d '{"content": {"topic": "Renewable Energy", "data": "Solar panel efficiency has increased by 20% in the last decade."}}'
+    ```
+    *(This will return a `context_id`)*
 
-#### Example Usage with `curl`
-```bash
-curl -X POST "http://127.0.0.1:8000/context/adapt" -H "Content-Type: application/json" -d '{
-  "input": "Analyze the financial markets for Q4 2024",
-  "domain": "finance",
-  "security_level": 1
-}'
-```
+2.  **Process the stored context with the LLM:**
+    ```bash
+    curl -X POST "http://127.0.0.1:8000/llm/process/{your_context_id_here}"
+    ```
