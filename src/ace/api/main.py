@@ -6,8 +6,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
+import json
 # Import the functional components
-from ace.core.implementation import DynamicContextRepository, Context, SecurityLevel
+from ace.core.implementation import DynamicContextRepository, Context, SecurityLevel, InputSanitizationEngine
 from ace.llm.client import process_context_with_llm
 
 app = FastAPI(
@@ -16,8 +17,9 @@ app = FastAPI(
     description="An API for the functional Dynamic Context Repository (DCR) component.",
 )
 
-# Instantiate the DCR
+# Instantiate the DCR and Sanitization Engine
 dcr = DynamicContextRepository(base_storage_path="api_dcr_storage")
+sanitization_engine = InputSanitizationEngine()
 
 class StoreRequest(BaseModel):
     content: dict
@@ -27,6 +29,7 @@ class StoreRequest(BaseModel):
 class StoreResponse(BaseModel):
     status: str
     context_id: str
+    sanitization_status: str
 
 class ProcessResponse(BaseModel):
     context_id: str
@@ -39,9 +42,14 @@ def startup_event():
 @app.post("/context/store", response_model=StoreResponse)
 def store_context(request: StoreRequest):
     """
-    Stores a new context in the Dynamic Context Repository.
+    Sanitizes and stores a new context in the Dynamic Context Repository.
     """
     try:
+        # Sanitize the input content before creating the context object
+        # We serialize the dict to a string to check for multi-line injections etc.
+        content_str = json.dumps(request.content)
+        sanitization_result = sanitization_engine.sanitize(content_str)
+
         sec_level = SecurityLevel(request.security_level)
 
         new_context = Context(
@@ -52,7 +60,11 @@ def store_context(request: StoreRequest):
 
         context_id = dcr.store(new_context)
 
-        return {"status": "success", "context_id": context_id}
+        return {
+            "status": "success",
+            "context_id": context_id,
+            "sanitization_status": sanitization_result['status']
+        }
 
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid security level")
