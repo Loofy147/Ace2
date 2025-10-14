@@ -8,7 +8,7 @@ The ACE system, as initially conceived, was overly ambitious and lacked a founda
 ---
 
 ## Phase 1: Multi-Tier Context Caching (DCR) - ✅ COMPLETE
-This phase focused on implementing a functional multi-tier caching system for contexts, as proposed in the `DynamicContextRepository` (DCR) concept.
+This phase focused on implementing a functional multi-tier caching system for contexts.
 
 ### Goals
 - [x] To build a robust and efficient caching system with four tiers (L1-L4).
@@ -18,28 +18,37 @@ This phase focused on implementing a functional multi-tier caching system for co
 
 ---
 
-## Phase 2: LLM Integration
-This phase focuses on connecting the ACE system to a real Large Language Model (LLM) to enable the processing of stored contexts.
+## Phase 2: LLM Integration - ✅ COMPLETE
+This phase focused on connecting the ACE system to a real Large Language Model (LLM) to enable the processing of stored contexts.
 
 ### Goals
-- [ ] To create a dedicated client for communicating with an LLM API (e.g., OpenAI).
-- [ ] To securely manage API keys using environment variables.
-- [ ] To expose the LLM processing functionality via a new API endpoint.
-- [ ] To write unit tests for the LLM client using mocking.
-- [ ] To update all documentation to reflect the new capabilities.
-
-### Development Plan & Checklist
-- [ ] **1. Setup Environment**: Add `openai` to `requirements.txt`.
-- [ ] **2. Create LLM Client**: Implement `src/ace/llm/client.py` to handle API communication.
-- [ ] **3. Implement API Endpoint**: Add `POST /llm/process/{context_id}` to `src/ace/api/main.py`.
-- [ ] **4. Write Unit Tests**: Create `tests/test_llm_client.py` with mock API calls.
-- [ ] **5. Update Documentation**: Update `README.md` and `ROADMAP.md`.
-- [ ] **6. Pre-Commit & Submission**: Run tests, get a code review, and submit.
+- [x] To create a dedicated client for communicating with an LLM API (e.g., OpenAI).
+- [x] To securely manage API keys using environment variables.
+- [x] To expose the LLM processing functionality via a new API endpoint.
+- [x] To write unit tests for the LLM client using mocking.
+- [x] To update all documentation to reflect the new capabilities.
 
 ---
 
-## Future Phases (Post-LLM Integration)
-Once the LLM integration is complete and verified, the following concrete problems could be addressed:
+## Phase 3: Basic Prompt Injection Detection
+This phase focuses on implementing a functional and testable prompt injection detection mechanism.
 
-- **Basic Prompt Injection Detection**: Implement a simple token-based detection mechanism.
+### Goals
+- [ ] To enhance the `InputSanitizationEngine` with concrete detection rules.
+- [ ] To integrate the sanitization check into the API.
+- [ ] To write unit tests to validate the detection logic.
+- [ ] To document the new security feature.
+
+### Development Plan & Checklist
+- [ ] **1. Enhance Engine**: Implement detection logic in `InputSanitizationEngine`.
+- [ ] **2. Write Unit Tests**: Create `tests/test_sanitization.py`.
+- [ ] **3. Integrate with API**: Return sanitization status from the `store` endpoint.
+- [ ] **4. Update Documentation**: Update `README.md` and `ROADMAP.md`.
+- [ ] **5. Pre-Commit & Submission**: Run tests, get a code review, and submit.
+
+---
+
+## Future Phases
+Once prompt injection detection is complete, the following concrete problems could be addressed:
+
 - **A/B Testing Framework for Prompts**: Build a simple framework for testing the performance of different prompt variations.

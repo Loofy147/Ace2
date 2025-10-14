@@ -173,83 +173,56 @@ class RedTeamResult:
     timestamp: datetime = field(default_factory=datetime.now)
 
 # ============================================================================
-# ADVERSARIAL CONTEXT ADAPTATION LAYER (ACAL)
+# INPUT PROCESSING
 # ============================================================================
-
-class AdversarialContextAdaptationLayer:
-    """Input processing with adversarial resilience"""
-
-    def __init__(self):
-        self.sanitization_engine = InputSanitizationEngine()
-        self.domain_classifier = DomainClassificationNetwork()
-        self.context_optimizer = ContextRequestOptimizer()
-        self.attack_history: List[RedTeamResult] = []
-
-    def process_input(self, input_text: str,
-                      security_level: SecurityLevel = SecurityLevel.PUBLIC) -> Context:
-        """Process input with multiple security checks"""
-        sanitized = self.sanitization_engine.sanitize(input_text)
-        domain, confidence = self.domain_classifier.classify(sanitized)
-        optimized_context = self.context_optimizer.optimize(sanitized, domain, security_level)
-
-        if random.random() < 0.1:  # 10% chance of red team test
-            self._run_adversarial_test(optimized_context)
-
-        return optimized_context
-
-    def _run_adversarial_test(self, context: Context):
-        """Execute adversarial test on context"""
-        attack = PromptInjectionAttack()
-        result = attack.execute(context)
-        self.attack_history.append(result)
-
-        if result.success:
-            logger.warning(f"Vulnerability detected: {result.description}")
-            context.adversarial_tested = True
-            context.confidence_score *= 0.9
 
 class InputSanitizationEngine:
     """Detect and neutralize malicious inputs"""
 
-    def __init__(self):
-        self.blacklist_patterns = [
-            "ignore previous", "disregard", "system prompt",
-            "reveal instructions", "bypass", "jailbreak"
-        ]
-        self.injection_score_threshold = 0.7
+    def __init__(self, detection_rules=None):
+        if detection_rules is None:
+            self.detection_rules = {
+                "keywords": [
+                    "ignore previous instructions", "disregard all prior directives", "system prompt",
+                    "reveal your instructions", "bypass", "jailbreak",
+                    "as an ai, you must", "your rules are"
+                ],
+                "command_sequences": [
+                    "---", "===", "###", ">>>"
+                ]
+            }
+        else:
+            self.detection_rules = detection_rules
 
-    def sanitize(self, text: str) -> str:
-        """Remove potentially harmful content"""
-        injection_score = self._calculate_injection_score(text)
-        if injection_score > self.injection_score_threshold:
-            logger.warning(f"Potential prompt injection detected (score: {injection_score:.2f})")
-            text = self._neutralize_injection(text)
-        
-        text = self._remove_exploits(text)
-        return text
-
-    def _calculate_injection_score(self, text: str) -> float:
-        """Calculate probability of prompt injection"""
-        score = 0.0
+    def sanitize(self, text: str) -> Dict[str, Any]:
+        """
+        Analyzes text for potential prompt injection and returns a status.
+        Returns a dictionary: {'status': 'passed'|'flagged', 'text': str}
+        """
+        original_text = text
         text_lower = text.lower()
-        for pattern in self.blacklist_patterns:
-            if pattern in text_lower:
-                score += 0.3
-        if text.count('\n') > 5:
-            score += 0.2
-        if ']]>' in text or '<![CDATA[' in text:
-            score += 0.4
-        return min(score, 1.0)
+        flagged = False
 
-    def _neutralize_injection(self, text: str) -> str:
-        """Neutralize detected injection attempts"""
-        for pattern in self.blacklist_patterns:
-            text = text.replace(pattern, f"[REDACTED:{pattern[:3]}...]")
-        return text
+        # Check for keywords
+        for keyword in self.detection_rules.get("keywords", []):
+            if keyword in text_lower:
+                logger.warning(f"Sanitization: Flagged due to keyword '{keyword}'")
+                flagged = True
+                break
+        
+        # Check for suspicious command-like sequences
+        if not flagged:
+            for seq in self.detection_rules.get("command_sequences", []):
+                if text.strip().startswith(seq):
+                    logger.warning(f"Sanitization: Flagged due to command sequence '{seq}'")
+                    flagged = True
+                    break
 
-    def _remove_exploits(self, text: str) -> str:
-        """Remove characters that could be used in exploits"""
-        return text.replace('\x00', '').replace('\r', '\n')
+        # For now, we only detect and flag, not neutralize.
+        # Neutralization could be added here if needed.
+
+        status = "flagged" if flagged else "passed"
+        return {"status": status, "text": original_text}
 
 class DomainClassificationNetwork:
     """Classify input into appropriate domain"""
