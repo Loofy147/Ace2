@@ -21,15 +21,13 @@ def format_prompt(context: Context) -> str:
     )
     return prompt
 
-def process_context_with_llm(context: Context) -> str:
+def process_context_with_llm(prompt: str) -> str:
     """
-    Processes a Context object with an LLM, returning the LLM's response.
+    Processes a prompt string with an LLM, returning the LLM's response.
     """
     try:
         api_key = get_openai_api_key()
         openai.api_key = api_key
-
-        prompt = format_prompt(context)
 
         # This is a basic call to the chat completions endpoint.
         # It can be customized with different models, parameters, etc.

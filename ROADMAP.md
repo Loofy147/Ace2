@@ -10,45 +10,38 @@ The ACE system, as initially conceived, was overly ambitious and lacked a founda
 ## Phase 1: Multi-Tier Context Caching (DCR) - ✅ COMPLETE
 This phase focused on implementing a functional multi-tier caching system for contexts.
 
-### Goals
-- [x] To build a robust and efficient caching system with four tiers (L1-L4).
-- [x] To implement automatic tiering of contexts based on usage patterns.
-- [x] To write comprehensive unit tests to ensure correctness and reliability.
-- [x] To provide clear and honest documentation of the implemented system.
-
 ---
 
 ## Phase 2: LLM Integration - ✅ COMPLETE
 This phase focused on connecting the ACE system to a real Large Language Model (LLM) to enable the processing of stored contexts.
 
-### Goals
-- [x] To create a dedicated client for communicating with an LLM API (e.g., OpenAI).
-- [x] To securely manage API keys using environment variables.
-- [x] To expose the LLM processing functionality via a new API endpoint.
-- [x] To write unit tests for the LLM client using mocking.
-- [x] To update all documentation to reflect the new capabilities.
+---
+
+## Phase 3: Basic Prompt Injection Detection - ✅ COMPLETE
+This phase focused on implementing a functional and testable prompt injection detection mechanism.
 
 ---
 
-## Phase 3: Basic Prompt Injection Detection
-This phase focuses on implementing a functional and testable prompt injection detection mechanism.
+## Phase 4: A/B Testing Framework for Prompts
+This phase focuses on building the infrastructure for A/B testing different prompt variations.
 
 ### Goals
-- [ ] To enhance the `InputSanitizationEngine` with concrete detection rules.
-- [ ] To integrate the sanitization check into the API.
-- [ ] To write unit tests to validate the detection logic.
-- [ ] To document the new security feature.
+- [ ] To enhance the `PromptEngineeringLaboratory` to manage and serve prompt variants.
+- [ ] To implement a simple in-memory tracking system for variant usage.
+- [ ] To create new API endpoints for creating and monitoring A/B tests.
+- [ ] To integrate A/B testing into the LLM processing endpoint.
+- [ ] To write unit tests for the A/B testing framework.
+- [ ] To document the new feature.
 
 ### Development Plan & Checklist
-- [ ] **1. Enhance Engine**: Implement detection logic in `InputSanitizationEngine`.
-- [ ] **2. Write Unit Tests**: Create `tests/test_sanitization.py`.
-- [ ] **3. Integrate with API**: Return sanitization status from the `store` endpoint.
-- [ ] **4. Update Documentation**: Update `README.md` and `ROADMAP.md`.
-- [ ] **5. Pre-Commit & Submission**: Run tests, get a code review, and submit.
+- [ ] **1. Enhance `PromptEngineeringLaboratory`**: Implement logic for managing and selecting prompt variants.
+- [ ] **2. Write Unit Tests**: Create `tests/test_ab_testing.py`.
+- [ ] **3. Implement API Endpoints**: Add routes for creating and viewing tests.
+- [ ] **4. Integrate with LLM Endpoint**: Add `ab_test_name` parameter to the `/llm/process` endpoint.
+- [ ] **5. Update Documentation**: Update `README.md` and `ROADMAP.md`.
+- [ ] **6. Pre-Commit & Submission**: Run tests, get a code review, and submit.
 
 ---
 
 ## Future Phases
-Once prompt injection detection is complete, the following concrete problems could be addressed:
-
-- **A/B Testing Framework for Prompts**: Build a simple framework for testing the performance of different prompt variations.
+Once the A/B testing framework is complete, the project can move towards implementing a feedback mechanism to measure the success of prompt variants.

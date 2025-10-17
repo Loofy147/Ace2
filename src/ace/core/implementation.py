@@ -601,49 +601,61 @@ class PriorityScorer:
         return scores
 
 class PromptEngineeringLaboratory:
-    """Evolve and optimize prompts"""
-    
+    """Manages A/B testing for different prompt variations."""
+
     def __init__(self):
-        self.templates = {
-            'accuracy': "Analyze the following with maximum precision: {text}",
-            'speed': "Quickly summarize: {text}",
-            'creativity': "Creatively interpret: {text}"
+        # Stores the A/B tests. Key: test_name, Value: dict of variants
+        self.ab_tests: Dict[str, Dict[str, str]] = {}
+        # Tracks usage stats. Key: test_name, Value: dict of variant usage counts
+        self.test_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        # Simple counter for round-robin selection
+        self.test_counters: Dict[str, int] = defaultdict(int)
+
+    def create_ab_test(self, test_name: str, variants: Dict[str, str]):
+        """Creates a new A/B test with a set of prompt variations."""
+        if test_name in self.ab_tests:
+            raise ValueError(f"A/B test with name '{test_name}' already exists.")
+        if not variants or len(variants) < 2:
+            raise ValueError("A/B test must have at least two variants.")
+
+        self.ab_tests[test_name] = variants
+        logger.info(f"Created A/B test '{test_name}' with variants: {list(variants.keys())}")
+
+    def get_prompt_variant(self, test_name: str, context: Context) -> Optional[Dict[str, str]]:
+        """
+        Gets the next prompt variant for a test using round-robin and formats it.
+        Returns a dictionary containing the selected variant name and the formatted prompt.
+        """
+        if test_name not in self.ab_tests:
+            return None
+
+        variants = self.ab_tests[test_name]
+        variant_names = sorted(variants.keys())
+        
+        # Round-robin selection
+        selection_index = self.test_counters[test_name] % len(variant_names)
+        selected_variant_name = variant_names[selection_index]
+        self.test_counters[test_name] += 1
+        
+        # Record the usage of this variant
+        self.test_stats[test_name][selected_variant_name] += 1
+        
+        # Format the prompt
+        prompt_template = variants[selected_variant_name]
+        formatted_prompt = prompt_template.format(context=json.dumps(context.content))
+        
+        logger.debug(f"Selected variant '{selected_variant_name}' for test '{test_name}'")
+        
+        return {
+            "variant_name": selected_variant_name,
+            "prompt": formatted_prompt
         }
-        self.evolution_history = []
-        
-    def generate_prompt(self, context: Context,
-                             objective: str) -> str:
-        """Generate optimized prompt for objective"""
-        template = self.templates.get(objective, self.templates['accuracy'])
-        
-        if random.random() < 0.1:
-            template = self._evolve_template(template, objective)
-        
-        text = context.content.get('text', '')
-        prompt = template.format(text=text)
-        return prompt
-    
-    def _evolve_template(self, template: str,
-                              objective: str) -> str:
-        """Evolve template through mutation"""
-        mutations = [
-            lambda t: t.replace("Analyze", "Examine"),
-            lambda t: t.replace("following", "given content"),
-            lambda t: t + " Be concise.",
-            lambda t: "Context: {text}\n" + t
-        ]
-        
-        mutation = random.choice(mutations)
-        evolved = mutation(template)
-        
-        self.evolution_history.append({
-            'original': template,
-            'evolved': evolved,
-            'objective': objective,
-            'timestamp': datetime.now()
-        })
-        
-        return evolved
+
+    def get_test_statistics(self, test_name: str) -> Optional[Dict[str, int]]:
+        """Returns the usage statistics for a given A/B test."""
+        if test_name not in self.ab_tests:
+            return None
+        return self.test_stats[test_name]
 
 class PerformanceTracker:
     """Track and analyze performance metrics"""
