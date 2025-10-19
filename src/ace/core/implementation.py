@@ -601,13 +601,15 @@ class PriorityScorer:
         return scores
 
 class PromptEngineeringLaboratory:
-    """Manages A/B testing for different prompt variations."""
+    """Manages A/B testing for different prompt variations and tracks feedback."""
 
     def __init__(self):
-        # Stores the A/B tests. Key: test_name, Value: dict of variants
+        # Stores the A/B tests: {test_name: {variant_name: prompt_template}}
         self.ab_tests: Dict[str, Dict[str, str]] = {}
-        # Tracks usage stats. Key: test_name, Value: dict of variant usage counts
-        self.test_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        # Stores traces of each variant usage: {trace_id: {"test_name": ..., "variant_name": ...}}
+        self.ab_test_traces: Dict[str, Dict[str, str]] = {}
+        # Stores feedback scores: {trace_id: score}
+        self.feedback: Dict[str, float] = {}
         # Simple counter for round-robin selection
         self.test_counters: Dict[str, int] = defaultdict(int)
 
@@ -623,8 +625,7 @@ class PromptEngineeringLaboratory:
 
     def get_prompt_variant(self, test_name: str, context: Context) -> Optional[Dict[str, str]]:
         """
-        Gets the next prompt variant for a test using round-robin and formats it.
-        Returns a dictionary containing the selected variant name and the formatted prompt.
+        Gets the next prompt variant for a test, formats it, and returns it with a trace_id.
         """
         if test_name not in self.ab_tests:
             return None
@@ -632,30 +633,54 @@ class PromptEngineeringLaboratory:
         variants = self.ab_tests[test_name]
         variant_names = sorted(variants.keys())
         
-        # Round-robin selection
         selection_index = self.test_counters[test_name] % len(variant_names)
         selected_variant_name = variant_names[selection_index]
         self.test_counters[test_name] += 1
         
-        # Record the usage of this variant
-        self.test_stats[test_name][selected_variant_name] += 1
+        trace_id = str(uuid.uuid4())
+        self.ab_test_traces[trace_id] = {"test_name": test_name, "variant_name": selected_variant_name}
         
-        # Format the prompt
         prompt_template = variants[selected_variant_name]
         formatted_prompt = prompt_template.format(context=json.dumps(context.content))
         
-        logger.debug(f"Selected variant '{selected_variant_name}' for test '{test_name}'")
+        logger.debug(f"Selected variant '{selected_variant_name}' for test '{test_name}' (trace_id: {trace_id})")
         
         return {
+            "trace_id": trace_id,
             "variant_name": selected_variant_name,
             "prompt": formatted_prompt
         }
 
-    def get_test_statistics(self, test_name: str) -> Optional[Dict[str, int]]:
-        """Returns the usage statistics for a given A/B test."""
+    def record_feedback(self, trace_id: str, score: float) -> bool:
+        """Records feedback for a given trace_id."""
+        if trace_id not in self.ab_test_traces:
+            return False
+        self.feedback[trace_id] = score
+        logger.info(f"Recorded feedback for trace_id '{trace_id}' with score {score}")
+        return True
+
+    def get_test_statistics(self, test_name: str) -> Optional[Dict[str, Any]]:
+        """Returns aggregated usage and feedback statistics for a given A/B test."""
         if test_name not in self.ab_tests:
             return None
-        return self.test_stats[test_name]
+
+        stats = defaultdict(lambda: {"usage_count": 0, "total_score": 0.0})
+
+        for trace_id, trace_data in self.ab_test_traces.items():
+            if trace_data["test_name"] == test_name:
+                variant = trace_data["variant_name"]
+                stats[variant]["usage_count"] += 1
+                if trace_id in self.feedback:
+                    stats[variant]["total_score"] += self.feedback[trace_id]
+
+        # Calculate average scores
+        for variant, data in stats.items():
+            if data["usage_count"] > 0:
+                data["average_score"] = data["total_score"] / data["usage_count"]
+            else:
+                data["average_score"] = 0.0
+
+        return {"test_name": test_name, "variants": dict(stats)}
 
 class PerformanceTracker:
     """Track and analyze performance metrics"""

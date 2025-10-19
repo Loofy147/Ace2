@@ -42,10 +42,11 @@ The API is available at `http://127.0.0.1:8000`.
 - **`POST /context/store`**: Sanitizes and stores a new context.
 - **`GET /context/retrieve/{context_id}`**: Retrieves a context.
 - **`POST /prompts/ab_tests`**: Creates a new A/B test for prompts.
-- **`GET /prompts/ab_tests/{test_name}`**: Retrieves the statistics for an A/B test.
-- **`POST /llm/process/{context_id}`**: Processes a stored context with an LLM. Can be used with an A/B test by providing an `ab_test_name` query parameter.
+- **`POST /prompts/feedback`**: Records feedback for a response from an A/B test.
+- **`GET /prompts/ab_tests/{test_name}`**: Retrieves aggregated usage and feedback statistics for an A/B test.
+- **`POST /llm/process/{context_id}`**: Processes a context with an LLM. Using an `ab_test_name` will return a `trace_id` for feedback.
 
-#### Example: Running an A/B Test
+#### Example: Running an A/B Test with Feedback
 1.  **Create an A/B test:**
     ```bash
     curl -X POST "http://127.0.0.1:8000/prompts/ab_tests" \
@@ -67,17 +68,23 @@ The API is available at `http://127.0.0.1:8000`.
     ```
     *(This will return a `context_id`)*
 
-3.  **Run the processing endpoint multiple times with the A/B test:**
+3.  **Run the processing endpoint with the A/B test:**
     ```bash
-    # First call might use variant_a
-    curl -X POST "http://127.0.0.1:8000/llm/process/{your_context_id_here}?ab_test_name=summary_test"
-
-    # Second call might use variant_b
+    # This call will use a variant from the test and return a trace_id
     curl -X POST "http://127.0.0.1:8000/llm/process/{your_context_id_here}?ab_test_name=summary_test"
     ```
+    *(The response will contain an `llm_response` and a `trace_id`)*
 
-4.  **Check the results:**
+4.  **Record feedback for the response:**
+    ```bash
+    curl -X POST "http://127.0.0.1:8000/prompts/feedback" \
+    -H "Content-Type: application/json" \
+    -d '{"trace_id": "{your_trace_id_here}", "score": 0.9}'
+    ```
+    *(A score from 0.0 to 1.0 is expected)*
+
+5.  **Check the aggregated results:**
     ```bash
     curl -X GET "http://127.0.0.1:8000/prompts/ab_tests/summary_test"
     ```
-    *(This will return the usage stats for each variant, e.g., `{"variant_a": 1, "variant_b": 1}`)*
+    *(This will return detailed stats including usage counts and average scores for each variant)*

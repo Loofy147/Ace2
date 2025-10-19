@@ -40,10 +40,15 @@ class ProcessResponse(BaseModel):
     context_id: str
     llm_response: str
     ab_test_variant: Optional[str] = None
+    trace_id: Optional[str] = None
 
 class CreateABTestRequest(BaseModel):
     test_name: str
     variants: Dict[str, str]
+
+class FeedbackInput(BaseModel):
+    trace_id: str
+    score: float
 
 @app.on_event("startup")
 def startup_event():
@@ -98,7 +103,8 @@ def retrieve_context(context_id: str):
 def process_with_llm(context_id: str, ab_test_name: Optional[str] = None):
     """
     Retrieves a context and processes its content with an LLM.
-    If ab_test_name is provided, a prompt variant from the test is used.
+    If ab_test_name is provided, a prompt variant from the test is used,
+    and a trace_id for feedback is returned.
     """
     try:
         context = dcr.retrieve(context_id)
@@ -106,6 +112,7 @@ def process_with_llm(context_id: str, ab_test_name: Optional[str] = None):
             raise HTTPException(status_code=404, detail="Context not found")
 
         selected_variant = None
+        trace_id = None
 
         if ab_test_name:
             variant_info = prompt_lab.get_prompt_variant(ab_test_name, context)
@@ -114,8 +121,8 @@ def process_with_llm(context_id: str, ab_test_name: Optional[str] = None):
 
             prompt = variant_info["prompt"]
             selected_variant = variant_info["variant_name"]
+            trace_id = variant_info["trace_id"]
         else:
-            # Default behavior: format a standard prompt
             prompt = format_prompt(context)
 
         llm_response = process_context_with_llm(prompt)
@@ -126,11 +133,11 @@ def process_with_llm(context_id: str, ab_test_name: Optional[str] = None):
         return {
             "context_id": context_id,
             "llm_response": llm_response,
-            "ab_test_variant": selected_variant
+            "ab_test_variant": selected_variant,
+            "trace_id": trace_id
         }
 
     except Exception as e:
-        # Catch exceptions from the LLM client, like missing API keys
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/prompts/ab_tests")
@@ -144,12 +151,22 @@ def create_ab_test(request: CreateABTestRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/prompts/feedback")
+def record_feedback(request: FeedbackInput):
+    """
+    Records feedback for a specific LLM response trace.
+    """
+    success = prompt_lab.record_feedback(request.trace_id, request.score)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Trace ID '{request.trace_id}' not found.")
+    return {"status": "success", "message": "Feedback recorded."}
+
 @app.get("/prompts/ab_tests/{test_name}")
 def get_ab_test_stats(test_name: str):
     """
-    Retrieves the usage statistics for a given A/B test.
+    Retrieves the usage and feedback statistics for a given A/B test.
     """
     stats = prompt_lab.get_test_statistics(test_name)
     if stats is None:
         raise HTTPException(status_code=404, detail=f"A/B test '{test_name}' not found.")
-    return {"test_name": test_name, "statistics": stats}
+    return stats
