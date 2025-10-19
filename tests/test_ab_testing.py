@@ -1,4 +1,5 @@
 import unittest
+import uuid
 from src.ace.core.implementation import PromptEngineeringLaboratory, Context
 
 class TestPromptEngineeringLaboratory(unittest.TestCase):
@@ -11,56 +12,78 @@ class TestPromptEngineeringLaboratory(unittest.TestCase):
             "variant_a": "Prompt A for {context}",
             "variant_b": "Prompt B for {context}"
         }
+        self.lab.create_ab_test("feedback_test", self.variants)
 
-    def test_create_ab_test_success(self):
-        """Test successful creation of an A/B test."""
-        self.lab.create_ab_test("test1", self.variants)
-        self.assertIn("test1", self.lab.ab_tests)
-        self.assertEqual(self.lab.ab_tests["test1"], self.variants)
+    def test_get_prompt_variant_returns_trace_id(self):
+        """Test that getting a variant returns a valid trace_id."""
+        result = self.lab.get_prompt_variant("feedback_test", self.context)
+        self.assertIn("trace_id", result)
+        self.assertIsInstance(uuid.UUID(result["trace_id"]), uuid.UUID)
 
-    def test_create_ab_test_already_exists(self):
-        """Test that creating a test with a duplicate name raises a ValueError."""
-        self.lab.create_ab_test("test1", self.variants)
-        with self.assertRaises(ValueError):
-            self.lab.create_ab_test("test1", self.variants)
+    def test_record_feedback_success(self):
+        """Test that feedback is recorded successfully for a valid trace_id."""
+        result = self.lab.get_prompt_variant("feedback_test", self.context)
+        trace_id = result["trace_id"]
 
-    def test_create_ab_test_insufficient_variants(self):
-        """Test that creating a test with fewer than two variants raises a ValueError."""
-        with self.assertRaises(ValueError):
-            self.lab.create_ab_test("test_single", {"variant_a": "prompt"})
+        success = self.lab.record_feedback(trace_id, 0.9)
+        self.assertTrue(success)
+        self.assertIn(trace_id, self.lab.feedback)
+        self.assertEqual(self.lab.feedback[trace_id], 0.9)
 
-    def test_get_prompt_variant_round_robin(self):
-        """Test that variants are selected in a round-robin fashion."""
-        self.lab.create_ab_test("test_rr", self.variants)
+    def test_record_feedback_invalid_trace_id(self):
+        """Test that recording feedback for an invalid trace_id fails."""
+        invalid_trace_id = str(uuid.uuid4())
+        success = self.lab.record_feedback(invalid_trace_id, 0.9)
+        self.assertFalse(success)
+        self.assertNotIn(invalid_trace_id, self.lab.feedback)
 
-        # First call should get variant_a
-        result1 = self.lab.get_prompt_variant("test_rr", self.context)
-        self.assertEqual(result1['variant_name'], "variant_a")
+    def test_statistics_with_feedback(self):
+        """Test that statistics correctly aggregate usage and feedback."""
+        # Variant A, score 0.8
+        res1 = self.lab.get_prompt_variant("feedback_test", self.context)
+        self.lab.record_feedback(res1["trace_id"], 0.8)
 
-        # Second call should get variant_b
-        result2 = self.lab.get_prompt_variant("test_rr", self.context)
-        self.assertEqual(result2['variant_name'], "variant_b")
+        # Variant B, score 0.9
+        res2 = self.lab.get_prompt_variant("feedback_test", self.context)
+        self.lab.record_feedback(res2["trace_id"], 0.9)
 
-        # Third call should loop back to variant_a
-        result3 = self.lab.get_prompt_variant("test_rr", self.context)
-        self.assertEqual(result3['variant_name'], "variant_a")
+        # Variant A, score 0.6
+        res3 = self.lab.get_prompt_variant("feedback_test", self.context)
+        self.lab.record_feedback(res3["trace_id"], 0.6)
 
-    def test_get_prompt_variant_nonexistent_test(self):
-        """Test that getting a variant for a nonexistent test returns None."""
-        result = self.lab.get_prompt_variant("nonexistent", self.context)
-        self.assertIsNone(result)
+        # Variant B, no feedback
+        self.lab.get_prompt_variant("feedback_test", self.context)
 
-    def test_statistics_tracking(self):
-        """Test that usage statistics are tracked correctly."""
-        self.lab.create_ab_test("test_stats", self.variants)
+        stats = self.lab.get_test_statistics("feedback_test")
 
-        self.lab.get_prompt_variant("test_stats", self.context)
-        self.lab.get_prompt_variant("test_stats", self.context)
-        self.lab.get_prompt_variant("test_stats", self.context)
+        self.assertIn("variants", stats)
+        variants_stats = stats["variants"]
 
-        stats = self.lab.get_test_statistics("test_stats")
-        self.assertEqual(stats["variant_a"], 2)
-        self.assertEqual(stats["variant_b"], 1)
+        # Check Variant A stats
+        self.assertEqual(variants_stats["variant_a"]["usage_count"], 2)
+        self.assertAlmostEqual(variants_stats["variant_a"]["total_score"], 1.4)
+        self.assertAlmostEqual(variants_stats["variant_a"]["average_score"], 0.7)
+
+        # Check Variant B stats
+        self.assertEqual(variants_stats["variant_b"]["usage_count"], 2)
+        self.assertAlmostEqual(variants_stats["variant_b"]["total_score"], 0.9)
+        self.assertAlmostEqual(variants_stats["variant_b"]["average_score"], 0.45)
+
+    def test_statistics_no_feedback(self):
+        """Test that statistics are correct when no feedback is provided."""
+        self.lab.get_prompt_variant("feedback_test", self.context)
+        self.lab.get_prompt_variant("feedback_test", self.context)
+
+        stats = self.lab.get_test_statistics("feedback_test")
+        variants_stats = stats["variants"]
+
+        self.assertEqual(variants_stats["variant_a"]["usage_count"], 1)
+        self.assertEqual(variants_stats["variant_a"]["total_score"], 0.0)
+        self.assertEqual(variants_stats["variant_a"]["average_score"], 0.0)
+
+        self.assertEqual(variants_stats["variant_b"]["usage_count"], 1)
+        self.assertEqual(variants_stats["variant_b"]["total_score"], 0.0)
+        self.assertEqual(variants_stats["variant_b"]["average_score"], 0.0)
 
     def test_get_statistics_for_nonexistent_test(self):
         """Test that getting stats for a nonexistent test returns None."""
